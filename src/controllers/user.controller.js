@@ -1,7 +1,7 @@
 import {asyncHandler} from "../utils/asyncHandler.js";
 import {ApiError} from "../utils/ApiError.js"
 import {User} from "../models/user.models.js"
-import {uploadOnCloudinary} from "../utils/cloudinary.js";
+import {uploadOnCloudinary,deleteImagefromCloudinary} from "../utils/cloudinary.js";
 import {ApiResponse} from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
 const generateAccessAndRefreshToken=async(userId)=>{
@@ -198,14 +198,14 @@ const changeCurrentPassword=asyncHandler(async(req,res)=>{
 const getCurrentUser=asyncHandler(async(req,res)=>{
   return res
   .status(200)
-  .json(200,req.user,"Current User fetched Successfully")
+  .json(new ApiResponse(200,req.user,"Current User fetched Successfully"))
 })
 const updateAccountDetails=asyncHandler(async(req,res)=>{
   const {fullname,email}=req.body
   if(!fullname||!email){
     throw new ApiError(400,"All feilds are  required");
   }
-  const user=User.findByIdAndUpdate(
+  const user=await User.findByIdAndUpdate(
     req.user?._id,
    {
     $set:{
@@ -222,43 +222,212 @@ const updateAccountDetails=asyncHandler(async(req,res)=>{
 // Now we want to add an updateFiles function where 2 middleware are needed:
 // 1. Multer: This middleware is used for handling multipart/form-data, which is primarily used for uploading files.
 // 2. User Logged In or Not: This middleware checks if the user is authenticated and logged in. However, for updating account details and changes, we don't need to check if the user is logged in because the update operation itself will be restricted to authenticated users only.
-const updateUserAvatar=asyncHandler(async(req,res)=>{
-  const avatarLocalPath=req.file?.path
-  if(!avatarLocalPath){
-    throw new ApiError(400,"Avatar file is missing")
+const updateUserAvatar = asyncHandler(async (req, res) => {
+  // Fetch the user from the database
+  const user = await User.findById(req.user?._id);
+  if (!user) {
+    throw new ApiError(400, "User not found");
   }
-  const avatar=await uploadOnCloudinary(avatarLocalPath)
-  if(!avatar.url){
-    throw new ApiError(400,"Error while uploading on avatar")
+
+  // Check if the user has an existing avatar
+  const oldAvatarPublicId = user.avatar?.public_id;
+  if (!oldAvatarPublicId) {
+    throw new ApiError(400, "Old avatar public ID not found");
   }
-  const user=await User.findByIdAndUpdate(req.user?._id,{$set:{avatar:avatar.url}},{new:true}).select("-password")
+
+  // Ensure the new avatar file path is available
+  const avatarLocalPath = req.file?.path;
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "Avatar file is missing");
+  }
+
+  // Upload the new avatar to Cloudinary
+  const newAvatar = await uploadOnCloudinary(avatarLocalPath);
+  if (!newAvatar || !newAvatar.url) {
+    throw new ApiError(400, "Error while uploading the new avatar");
+  }
+
+  // Update the user's avatar with the new Cloudinary data
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user?._id,
+    { $set: { avatar: { url: newAvatar.url, public_id: newAvatar.public_id } } },
+    { new: true }
+  ).select("-password");
+
+  if (!updatedUser) {
+    throw new ApiError(400, "Error updating the user's avatar");
+  }
+
+  // Delete the old avatar from Cloudinary
+  const deleteFromCloudinary = await deleteImagefromCloudinary(oldAvatarPublicId);
+  if (!deleteFromCloudinary || deleteFromCloudinary.result !== 'ok') {
+    throw new ApiError(400, "Error while deleting the old avatar");
+  }
+
+  // Send a success response with the updated user data
+  return res.status(200).json(
+    new ApiResponse(200, updatedUser, "Avatar updated successfully")
+  );
+});
+
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+  // Ensure that the cover image file path is present
+  const coverImageLocalPath = req.file?.path;
+  if (!coverImageLocalPath) {
+    throw new ApiError(400, "Cover image is missing");
+  }
+
+  // Fetch the user from the database
+  const user = await User.findById(req.user?._id);
+  if (!user) {
+    throw new ApiError(400, "User not found");
+  }
+
+  // Check if there's an existing cover image and store its public_id
+  const oldCoverImagePublicId = user.coverImage?.public_id;
+
+  // Upload the new cover image to Cloudinary
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+  if (!coverImage.url || !coverImage.public_id) {
+    throw new ApiError(400, "Error while uploading cover image");
+  }
+
+  // Update the user's cover image with the new URL and public_id
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user?._id,
+    { $set: { coverImage: { url: coverImage.url, public_id: coverImage.public_id } } },
+    { new: true }
+  ).select("-password");
+
+  if (!updatedUser) {
+    throw new ApiError(400, "Error updating cover image in the database");
+  }
+
+  // Delete the old cover image from Cloudinary (if it exists)
+  if (oldCoverImagePublicId) {
+    const deleteResult = await deleteImagefromCloudinary(oldCoverImagePublicId);
+    if (!deleteResult || deleteResult.result !== 'ok') {
+      throw new ApiError(400, "Error while deleting old cover image");
+    }
+  }
+
+  // Return a successful response with the updated user data
+  return res.status(200).json(
+    new ApiResponse(200, updatedUser, "Cover image updated successfully")
+  );
+});
+const getUserChannelProfile=asyncHandler(async(req,res)=>{
+  const {username}=req.params//because here want username from url thats why we are using params
+  if(!username?.trim()){
+    throw new ApiError(400,"username is missing")
+  }
+
+  const channel=await User.aggregate([
+    {
+      $match:{
+        username:username?.toLowerCase()
+      }
+    },
+    {
+      $lookup:{
+        from:"subscriptions",//we are importing as Subscription from model but in database it saaved in lower+plural form suppose Go it do not go like goes but go like gos
+        localField:"_id",
+        foreignField:"channel",
+        as:"subscribers"//yaha kucchh bhi likh sakte hai
+      }
+    },
+    {
+      $lookup:{
+        from:"subscriptions",
+        localField:"_id",
+        foreignField:"subscriber",
+        as:"subscribedTo"
+      }
+    },{
+      $addFields:{
+        subscribersCount:{
+          $size:"$subscribers"
+        },
+        channelsSubscribedToCount:{
+          $size:"$subscribedTo"
+        },
+        isSubscribed:{
+          $cond:{
+            if:{$in:[req.user?._id,"$subscribers:subscriber"]},
+            then:true,
+            else:false
+          }
+        }
+      }
+    },
+    {
+      $project:{
+        fullname:1,
+        username:1,
+        subscribersCount:1,
+        channelsSubscribedToCount:1,
+        isSubscribed:1,
+        avatar:1,
+        coverImage:1,
+        email:1
+      }
+    }
+  ])
+  if(!channel?.length){
+    throw new ApiError(404,"channel does not exists")
+  }
   return res
-.status(200)
-.json(
-  new ApiResponse(200,user," Avatar Updated Successfully")
-)
+  .status(200)
+  .json(
+    new ApiResponse(200,channel[0],"User channel fetched successfully")
+  )
 })
-const updateUserCoverImage=asyncHandler(async(req,res)=>{
-const coverImageLocalPath=req.file?.path;
-if(!coverImageLocalPath){
-  throw new ApiError(400,"Cover Image is missing")
-}
-const coverImage=uploadOnCloudinary(coverImageLocalPath)
-if(!coverImage.url){
-  throw new ApiError(400,"Error while uploading coverimage");
-}
-const user=await User.findByIdAndUpdate(req.user?._id,
+const getWatchHistory=asyncHandler(async(req,res)=>{
+  const user=await User.aggregate([
+    {
+    $match:{
+      _id:new mongoose.Types.ObjextId(req.user._id)//as we done it earlier that in agrregate function mongoose do not word thats why we are getting exported model name in plural and here id stored in mongodb databse in string but it is converted to id by mongoose as here mongoose do not word we need to explicitely convert it
+    }
+  },
   {
-  $set:{
-    coverImage:coverImage.url
+    $lookup:{
+      from:"videos",
+      localField:"watchHistory",
+      foreignField:"_id",
+      as:"watchHistory",
+      pipeline:[
+        {
+          $lookup:{
+            from:"users",
+            localField:"owner",
+            foreignField:"_id",
+            as:"owner",
+            pipeline:[
+              {
+                $project:{
+                  fullname:1,
+                  username:1,
+                  avatar:1
+                }
+              }
+            ]
+          }
+        },
+        {
+          $addFields:{
+            owner:{
+              $first:"$owner"
+            }
+          }
+        }
+      ]
+    }
   }
-},
-{new:true}
-).select("-password")
+])
 return res
 .status(200)
 .json(
-  new ApiResponse(200,user,"Cover Image Updated Successfully")
+  new ApiResponse(200,user[0].watchHistory,"Watch History Fetched SuccessFully")
 )
 })
 export {registerUser,
@@ -269,4 +438,5 @@ export {registerUser,
   getCurrentUser,
   updateAccountDetails,
   updateUserAvatar,
-updateUserCoverImage}
+updateUserCoverImage,
+getUserChannelProfile,getWatchHistory}
