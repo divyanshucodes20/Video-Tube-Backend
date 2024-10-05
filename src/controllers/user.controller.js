@@ -13,7 +13,7 @@ const generateAccessAndRefreshToken=async(userId)=>{
     //yaha hum logo ne ek hi feild ne login karaya hai matlab bina password ke thats why we use validateBeforeSa ve:false to not to validate
     return {accessToken,refreshToken}
   } catch (error) {
-    throw new ApiError(500,"Something went wrong while generating refresh and scces token");
+    throw new ApiError(500,"Something went wrong while generating refresh and access token");
     
   }
 }
@@ -86,7 +86,7 @@ const loginUser=asyncHandler(async(req,res)=>{
   //access and refresh token
   //send tokens in cookies
   const {email,username,password}=req.body
-  if(!username||!email){
+  if(!(username||email)){
     throw new ApiError(400,"username or email is required")
   }
   const user= await User.findOne({
@@ -124,7 +124,7 @@ const logoutUser=asyncHandler(async(req,res)=>{  //cookie se user ka data jo set
     req.user._id,
     {
       $set:{
-        refreshToken:undefinded
+        refreshToken:undefined
       }
     },
     {
