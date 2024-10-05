@@ -178,4 +178,95 @@ try {
   throw new ApiError(401,error?.message||"Invalid refresh token");
 }
 })
-export {registerUser,loginUser,logoutUser,refreshAccessToken}
+const changeCurrentPassword=asyncHandler(async(req,res)=>{
+  const {oldPassword,newPassword}=req.body;
+  //as user changing password means he/she is loggeddin if loggedin  auth middleware came in existent we have set req.user=user mans now we can access user 
+  /*if(!(newPassword===confPassword)){this is used when we want user to enter new password twice and one change also above in object we also take cnfpassword(like this oldPassword,newPassword,cnfpassword)
+    throw new ApiError(400,"new Password and confirm do not match")
+  }*/
+  const user=await User.findById(req.user?._id)
+  const ispasswordCorrect=await user.isPasswordCorrect(oldPassword)
+  if(!ispasswordCorrect){
+    throw new ApiError(400,"Invalid oldPassword")
+  }
+  user.password=newPassword
+  await user.save({validateBeforeSave:false})
+  return res
+  .status(200)
+  .json(new ApiResponse(200,{},"Password Changed Successfully"))
+})
+const getCurrentUser=asyncHandler(async(req,res)=>{
+  return res
+  .status(200)
+  .json(200,req.user,"Current User fetched Successfully")
+})
+const updateAccountDetails=asyncHandler(async(req,res)=>{
+  const {fullname,email}=req.body
+  if(!fullname||!email){
+    throw new ApiError(400,"All feilds are  required");
+  }
+  const user=User.findByIdAndUpdate(
+    req.user?._id,
+   {
+    $set:{
+      fullname,//also write as fullname:fullname
+      email//also write as emial:email
+    }
+   },
+   {new:true}
+  ).select("-password")
+  return res
+  .staus(200)
+  .json(new ApiResponse(200,user,"Account details updated successfully"))
+})
+// Now we want to add an updateFiles function where 2 middleware are needed:
+// 1. Multer: This middleware is used for handling multipart/form-data, which is primarily used for uploading files.
+// 2. User Logged In or Not: This middleware checks if the user is authenticated and logged in. However, for updating account details and changes, we don't need to check if the user is logged in because the update operation itself will be restricted to authenticated users only.
+const updateUserAvatar=asyncHandler(async(req,res)=>{
+  const avatarLocalPath=req.file?.path
+  if(!avatarLocalPath){
+    throw new ApiError(400,"Avatar file is missing")
+  }
+  const avatar=await uploadOnCloudinary(avatarLocalPath)
+  if(!avatar.url){
+    throw new ApiError(400,"Error while uploading on avatar")
+  }
+  const user=await User.findByIdAndUpdate(req.user?._id,{$set:{avatar:avatar.url}},{new:true}).select("-password")
+  return res
+.status(200)
+.json(
+  new ApiResponse(200,user," Avatar Updated Successfully")
+)
+})
+const updateUserCoverImage=asyncHandler(async(req,res)=>{
+const coverImageLocalPath=req.file?.path;
+if(!coverImageLocalPath){
+  throw new ApiError(400,"Cover Image is missing")
+}
+const coverImage=uploadOnCloudinary(coverImageLocalPath)
+if(!coverImage.url){
+  throw new ApiError(400,"Error while uploading coverimage");
+}
+const user=await User.findByIdAndUpdate(req.user?._id,
+  {
+  $set:{
+    coverImage:coverImage.url
+  }
+},
+{new:true}
+).select("-password")
+return res
+.status(200)
+.json(
+  new ApiResponse(200,user,"Cover Image Updated Successfully")
+)
+})
+export {registerUser,
+  loginUser,
+  logoutUser,
+  refreshAccessToken,
+  changeCurrentPassword,
+  getCurrentUser,
+  updateAccountDetails,
+  updateUserAvatar,
+updateUserCoverImage}
