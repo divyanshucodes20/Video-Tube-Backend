@@ -124,8 +124,8 @@ const logoutUser=asyncHandler(async(req,res)=>{  //cookie se user ka data jo set
  await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set:{
-        refreshToken:undefined
+      $unset:{
+        refreshToken:1//this remove the feild from the document
       }
     },
     {
