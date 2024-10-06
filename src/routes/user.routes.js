@@ -26,5 +26,5 @@ router.route("/update-account").patch(verifyJWT,updateAccountDetails)//here patc
 router.route("/avatar").patch(verifyJWT,upload.single("avatar"),updateUserAvatar)//here .single means in usercontroller we use req.file not files
 router.route("/cover-image").patch(verifyJWT,upload.single("coverImage"),updateUserCoverImage)
 router.route("/c/:username").get(verifyJWT,getUserChannelProfile)//as we are taking req.paarams thats why here route is diff aur yaha user kuchh bhej nahi raha toh hum get use karee hai
-router.route("history").get(verifyJWT,getWatchHistory)
+router.route("/history").get(verifyJWT,getWatchHistory)
 export default router//jab export default karte hai tab usko import router aise karte hai aur agar isko hum aise karte ki export {router} then humko isko import {router} karna padta

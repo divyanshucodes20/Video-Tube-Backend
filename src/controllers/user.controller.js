@@ -4,6 +4,7 @@ import {User} from "../models/user.models.js"
 import {uploadOnCloudinary,deleteImagefromCloudinary} from "../utils/cloudinary.js";
 import {ApiResponse} from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
+import mongoose from "mongoose";
 const generateAccessAndRefreshToken=async(userId)=>{
   try {
     const user=await User.findById(userId)
@@ -391,7 +392,7 @@ const getWatchHistory=asyncHandler(async(req,res)=>{
   const user=await User.aggregate([
     {
     $match:{
-      _id:new mongoose.Types.ObjextId(req.user._id)//as we done it earlier that in agrregate function mongoose do not word thats why we are getting exported model name in plural and here id stored in mongodb databse in string but it is converted to id by mongoose as here mongoose do not word we need to explicitely convert it
+      _id:new mongoose.Types.ObjectId(req.user._id)//as we done it earlier that in agrregate function mongoose do not word thats why we are getting exported model name in plural and here id stored in mongodb databse in string but it is converted to id by mongoose as here mongoose do not word we need to explicitely convert it
     }
   },
   {
@@ -429,6 +430,9 @@ const getWatchHistory=asyncHandler(async(req,res)=>{
     }
   }
 ])
+if (!user.length || !user[0].watchHistory) {
+  throw new ApiError(404, "Watch history not found");
+}
 return res
 .status(200)
 .json(
