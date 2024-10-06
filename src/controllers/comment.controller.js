@@ -22,34 +22,64 @@ const getVideoComments = asyncHandler(async (req, res) => {
 })
 
 const addComment = asyncHandler(async (req, res) => {
-    // TODO: add a comment to a video
-    const {content}=req.body;
-    const {videoId}=req.params;
-    const user=await User.findById(req?.user._id)
-    if(!videoId) {
-        throw new ApiError(500, "video id is required")
+    const { content } = req.body;
+    const { videoId } = req.params;
+    if (!mongoose.isValidObjectId(videoId)) {
+        throw new ApiError(400, "Invalid Video ID");
+    }
+    if (!content) {
+        throw new ApiError(401, "Please add the comment");
+    }
+    const user = await User.findById(req.user._id).select("username fullname avatar");
+    if (!user) {
+        throw new ApiError(401, "User not found");
+    }
+    const newComment = await Comment.create({
+        content,
+        video: videoId,
+        owner: user._id
+    });
+    const commentWithOwner=await Comment.aggregate([
+        {
+            $match:{
+                _id:new mongoose.Types.ObjectId(newComment._id)
+            }
+        },
+        {
+            $lookup:{
+                from:"users",
+                localField:"owner",
+                foreignField:"_id",
+                as:"owner"
+            }
+        },
+        {$unwind:"$owner"},
+        {
+            $project:{
+                content:1,
+                video:1,
+                owner:{
+                    _id:1,
+                    username:1,
+                    fullname:1,
+                    avatar:1
+                },
+                createdAt:1,
+                updatedAt:1
+            }
+        }
+    ]);
+    if (!newComment) {
+        throw new ApiError(401, "Comment creation failed");
     }
 
-    if(!content) {
-        throw new ApiError(401, "please add the comment")
-    }
-    const newComment=await Comment.create({
-        content,
-        video:videoId,
-        owner:user
-    })
-   if(!newComment){
-    throw new ApiError(401,"Comment creation failed");
-   }
-   return res
-   .status(200)
-   .json(new ApiResponse(201,newComment,"Comment added successfully"))
-})
+    return res.status(201).json(new ApiResponse(201, commentWithOwner[0], "Comment added successfully"));
+});
 
 const updateComment = asyncHandler(async (req, res) => {
     // TODO: update a comment
-    const {comment}=req.body;
-    if(!comment) {
+    const {content}=req.body;
+    if(!content) {
         throw new ApiError(401, "Comment not found")
     }
     const {commentId}=req.params;
@@ -66,19 +96,19 @@ const updateComment = asyncHandler(async (req, res) => {
    }
    return res
    .status(200)
-   .json(new ApiResponse(201,"comment added successfully"))
+   .json(new ApiResponse(200,updatedComment,"comment added successfully"))
 })
 
 const deleteComment = asyncHandler(async (req, res) => {
     // TODO: delete a comment
     const {commentId}=req.params;
-    const comment=await findByIdAndDelete(commentId);
+    const comment=await Comment.findByIdAndDelete(commentId);
     if(!comment){
         throw new Error(401,"Comment not deleted");
     }
     return res
     .status(200)
-    .json(new ApiResponse(201,"Comment added successfully"))
+    .json(new ApiResponse(201,"Comment deleted successfully"))
 })
 
 export {
