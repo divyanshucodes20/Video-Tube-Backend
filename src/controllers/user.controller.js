@@ -217,7 +217,7 @@ const updateAccountDetails=asyncHandler(async(req,res)=>{
    {new:true}
   ).select("-password")
   return res
-  .staus(200)
+  .status(200)
   .json(new ApiResponse(200,user,"Account details updated successfully"))
 })
 // Now we want to add an updateFiles function where 2 middleware are needed:
@@ -231,9 +231,9 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   }
 
   // Check if the user has an existing avatar
-  const oldAvatarPublicId = user.avatar?.public_id;
-  if (!oldAvatarPublicId) {
-    throw new ApiError(400, "Old avatar public ID not found");
+  const oldAvatar = user?.avatar;
+  if (!oldAvatar) {
+    throw new ApiError(400, "Old avatar  not found");
   }
 
   // Ensure the new avatar file path is available

@@ -1,6 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken";
 import { User } from "../models/user.models.js";
+import {ApiError} from "../utils/ApiError.js";
 export const verifyJWT = asyncHandler(async (req, _, next) => {//underscore because we are not using response( means res)
     // We are able to write req.cookie here because of app.use(cookieParser()) in app.js
     // and we are able to access token from it because we have added token in cookies in user controller

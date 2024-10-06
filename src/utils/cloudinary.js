@@ -26,24 +26,27 @@ const uploadOnCloudinary = async (localFilePath) => {
         return null;
     }
 }
-const deleteImagefromCloudinary = async (publicId) => {
-    try {
-      if (!publicId) {
-        throw new ApiError(400, "Public ID is required to delete an image");
+const deleteImagefromCloudinary = async (URL) => {
+  try {
+    if (!URL) return false;
+
+    let ImageId = URL.match(
+      /(?:image|video)\/upload\/v\d+\/videotube\/(photos|videos)\/(.+?)\.\w+$/
+    )[2];
+
+    console.log("deleting image from cloudinary...");
+
+    const cldnry_res = await cloudinary.uploader.destroy(
+      `videotube/photos/${ImageId}`,
+      {
+        resource_type: "image",
       }
-  
-      // Attempt to delete the image on Cloudinary using the public_id
-      const result = await cloudinary.uploader.destroy(publicId);
-  
-      if (result.result !== 'ok') {
-        throw new ApiError(400, `Failed to delete image from Cloudinary: ${result.result}`);
-      }
-  
-      return result;
-    } catch (error) {
-      // Throw a new error with a custom message or fallback to the error's original message
-      throw new ApiError(400, error.message || "Error deleting image from Cloudinary");
-    }
-  };
-  
+    );
+
+    return cldnry_res;
+  } catch (error) {
+    console.log("CLOUDINARY :: FILE Delete ERROR ", error);
+    return false;
+  }
+};
 export {uploadOnCloudinary,deleteImagefromCloudinary}
