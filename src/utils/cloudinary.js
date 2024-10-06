@@ -26,27 +26,33 @@ const uploadOnCloudinary = async (localFilePath) => {
         return null;
     }
 }
-const deleteImagefromCloudinary = async (URL) => {
+const deleteImagefromCloudinary = async (url) => {
   try {
-    if (!URL) return false;
+    if (!url) return false;
 
-    let ImageId = URL.match(
-      /(?:image|video)\/upload\/v\d+\/videotube\/(photos|videos)\/(.+?)\.\w+$/
-    )[2];
+    // Extract the public ID from the Cloudinary URL
+    const publicIdMatch = url.match(/\/upload\/v\d+\/(.+?)(?:\.\w+)?$/);
+    const publicId = publicIdMatch ? publicIdMatch[1] : null;
 
-    console.log("deleting image from cloudinary...");
+    if (!publicId) {
+      console.log("No public ID found in the URL");
+      return false;
+    }
 
-    const cldnry_res = await cloudinary.uploader.destroy(
-      `videotube/photos/${ImageId}`,
-      {
-        resource_type: "image",
-      }
-    );
+    console.log("Deleting image from Cloudinary...");
 
-    return cldnry_res;
+    const deleteResult = await cloudinary.uploader.destroy(publicId, {
+      resource_type: "image",
+    });
+
+    console.log("Delete result:", deleteResult);
+    return deleteResult;
   } catch (error) {
     console.log("CLOUDINARY :: FILE Delete ERROR ", error);
     return false;
   }
 };
+
+
+
 export {uploadOnCloudinary,deleteImagefromCloudinary}

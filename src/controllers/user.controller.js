@@ -224,53 +224,51 @@ const updateAccountDetails=asyncHandler(async(req,res)=>{
 // 1. Multer: This middleware is used for handling multipart/form-data, which is primarily used for uploading files.
 // 2. User Logged In or Not: This middleware checks if the user is authenticated and logged in. However, for updating account details and changes, we don't need to check if the user is logged in because the update operation itself will be restricted to authenticated users only.
 const updateUserAvatar = asyncHandler(async (req, res) => {
-  // Fetch the user from the database
-  const user = await User.findById(req.user?._id);
-  if (!user) {
-    throw new ApiError(400, "User not found");
-  }
-
-  // Check if the user has an existing avatar
-  const oldAvatar = user?.avatar;
-  if (!oldAvatar) {
-    throw new ApiError(400, "Old avatar  not found");
-  }
-
-  // Ensure the new avatar file path is available
   const avatarLocalPath = req.file?.path;
+
   if (!avatarLocalPath) {
-    throw new ApiError(400, "Avatar file is missing");
+      throw new ApiError(400, "Avatar file is missing");
   }
 
   // Upload the new avatar to Cloudinary
-  const newAvatar = await uploadOnCloudinary(avatarLocalPath);
-  if (!newAvatar || !newAvatar.url) {
-    throw new ApiError(400, "Error while uploading the new avatar");
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+  if (!avatar || !avatar.url) {
+      throw new ApiError(400, "Error while uploading the avatar");
   }
 
-  // Update the user's avatar with the new Cloudinary data
+  // Fetch the user from the database
+  const user = await User.findById(req.user?._id);
+  if (!user) {
+      throw new ApiError(400, "User not found");
+  }
+
+  // Check if the user has an existing avatar
+  const oldAvatar = user?.avatar; // Store the old avatar URL
+  if (oldAvatar) {
+      // Delete the old avatar from Cloudinary
+      const deleteFromCloudinary = await deleteImagefromCloudinary(oldAvatar);
+      if (!deleteFromCloudinary || deleteFromCloudinary.result !== 'ok') {
+          console.error("Error while deleting the old avatar from Cloudinary");
+          // Continue even if the deletion fails; the user still gets the new avatar
+      }
+  }
+
+  // Update the user's avatar with the new URL
   const updatedUser = await User.findByIdAndUpdate(
-    req.user?._id,
-    { $set: { avatar: { url: newAvatar.url, public_id: newAvatar.public_id } } },
-    { new: true }
+      req.user?._id,
+      {
+          $set: {
+              avatar: avatar.url
+          }
+      },
+      { new: true }
   ).select("-password");
-
-  if (!updatedUser) {
-    throw new ApiError(400, "Error updating the user's avatar");
-  }
-
-  // Delete the old avatar from Cloudinary
-  const deleteFromCloudinary = await deleteImagefromCloudinary(oldAvatarPublicId);
-  if (!deleteFromCloudinary || deleteFromCloudinary.result !== 'ok') {
-    throw new ApiError(400, "Error while deleting the old avatar");
-  }
 
   // Send a success response with the updated user data
   return res.status(200).json(
-    new ApiResponse(200, updatedUser, "Avatar updated successfully")
+      new ApiResponse(200, updatedUser, "Avatar image updated successfully")
   );
 });
-
 const updateUserCoverImage = asyncHandler(async (req, res) => {
   // Ensure that the cover image file path is present
   const coverImageLocalPath = req.file?.path;
@@ -284,19 +282,19 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     throw new ApiError(400, "User not found");
   }
 
-  // Check if there's an existing cover image and store its public_id
-  const oldCoverImagePublicId = user.coverImage?.public_id;
+  // Check if there's an existing cover image URL
+  const oldCoverImageUrl = user.coverImage; // Adjust this if the old cover image is stored differently
 
   // Upload the new cover image to Cloudinary
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
-  if (!coverImage.url || !coverImage.public_id) {
+  if (!coverImage.url) {
     throw new ApiError(400, "Error while uploading cover image");
   }
 
-  // Update the user's cover image with the new URL and public_id
+  // Update the user's cover image with the new URL
   const updatedUser = await User.findByIdAndUpdate(
     req.user?._id,
-    { $set: { coverImage: { url: coverImage.url, public_id: coverImage.public_id } } },
+    { $set: { coverImage: coverImage.url } },
     { new: true }
   ).select("-password");
 
@@ -305,8 +303,9 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   }
 
   // Delete the old cover image from Cloudinary (if it exists)
-  if (oldCoverImagePublicId) {
-    const deleteResult = await deleteImagefromCloudinary(oldCoverImagePublicId);
+  if (oldCoverImageUrl) {
+    const deleteResult = await deleteImagefromCloudinary(oldCoverImageUrl);
+    console.log("Delete result:", deleteResult);
     if (!deleteResult || deleteResult.result !== 'ok') {
       throw new ApiError(400, "Error while deleting old cover image");
     }
@@ -317,6 +316,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     new ApiResponse(200, updatedUser, "Cover image updated successfully")
   );
 });
+
 const getUserChannelProfile = asyncHandler(async (req, res) => {
   const { username } = req.params;
 
