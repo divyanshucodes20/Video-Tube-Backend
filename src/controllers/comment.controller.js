@@ -15,10 +15,31 @@ const getVideoComments = asyncHandler(async (req, res) => {
     const comments = await Comment.aggregate([
         {
             $match:{
-                
+                video:new mongoose.Types.ObjectId(videoId)
             }
-        }
-    ])
+        },
+        {
+            $lookup:{
+                from:"users",
+                localField:"owner",
+                foreignField:"_id",
+                as:"user"
+            }
+        },{$unwind:"$user"},
+        {
+            $project:{
+                content:1,
+                createdAt:1,
+                updatedAt:1,
+                user:{
+                    _id:1,
+                    username:1,
+                    fullanme:1,
+                    avatar:1
+                }
+            }
+        },{$skip:(page-1)*limit},{$limit:limit}
+    ]);
     if(!comments||comments.length==0){
         throw new ApiError(401,"Comment not added something went wrong");   
     }
