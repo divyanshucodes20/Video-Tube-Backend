@@ -12,10 +12,14 @@ const getVideoComments = asyncHandler(async (req, res) => {
         throw new ApiError(500, "video id is required")
     }
     const {page = 1, limit = 10} = req.query
-    const comments = await Comment.find({ videoId })
-    .skip((page - 1) * limit)
-    .limit(limit);
-    if(!comments){
+    const comments = await Comment.aggregate([
+        {
+            $match:{
+                
+            }
+        }
+    ])
+    if(!comments||comments.length==0){
         throw new ApiError(401,"Comment not added something went wrong");   
     }
     return res.status(200).json(new ApiResponse(200,comments,"Video Comments fetched successfully"));

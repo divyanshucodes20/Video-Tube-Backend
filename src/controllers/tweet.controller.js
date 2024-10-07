@@ -69,8 +69,36 @@ const getUserTweets = asyncHandler(async (req, res) => {
     if(!userId){
         throw new ApiError(500,"User Id is invalid");
     }
-    const tweets=await Tweet.find({userId}).skip((page-1)*limit).limit(limit)
-    if(!tweets){
+    const tweets=await Tweet.aggregate([
+        {
+            $match:{
+                owner:new mongoose.Types.ObjectId(userId)
+            }
+        },
+        {
+            $lookup:{
+                from:"users",
+                localField:"owner",
+                foreignField:"_id",
+                as:"user"
+            }
+        },
+        {$unwind:"$user"},
+        {
+            $project:{
+                content:1,
+                createdAt:1,
+                updatedAt:1,
+                user:{
+                    _id:1,
+                    username:1,
+                    fullname:1,
+                    avatar:1
+                }
+            }
+        },{$skip:(page-1)*limit},{$limit:limit}
+    ]);
+    if(!tweets||tweets.length===0){
         throw new ApiError(401,"Tweets not found");
     }
     return res
