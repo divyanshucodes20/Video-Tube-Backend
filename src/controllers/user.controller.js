@@ -1,7 +1,7 @@
 import {asyncHandler} from "../utils/asyncHandler.js";
 import {ApiError} from "../utils/ApiError.js"
 import {User} from "../models/user.models.js"
-import {uploadOnCloudinary,deleteImagefromCloudinary} from "../utils/cloudinary.js";
+import {uploadOnCloudinary,deletefromCloudinary} from "../utils/cloudinary.js";
 import {ApiResponse} from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
 import mongoose from "mongoose";
@@ -246,7 +246,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   const oldAvatar = user?.avatar; // Store the old avatar URL
   if (oldAvatar) {
       // Delete the old avatar from Cloudinary
-      const deleteFromCloudinary = await deleteImagefromCloudinary(oldAvatar);
+      const deleteFromCloudinary = await deletefromCloudinary(oldAvatar);
       if (!deleteFromCloudinary || deleteFromCloudinary.result !== 'ok') {
           console.error("Error while deleting the old avatar from Cloudinary");
           // Continue even if the deletion fails; the user still gets the new avatar
