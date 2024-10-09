@@ -14,8 +14,29 @@ const getAllVideos = asyncHandler(async (req, res) => {
 })
 
 const publishAVideo = asyncHandler(async (req, res) => {
-    const { title, description} = req.body
-    // TODO: get video, upload to cloudinary, create video
+    const { title, description,videoFile,thumbnail} = req.body
+    if ([title,description,videoFile,thumbnail].some((feild)=>
+        feild?.trim()==="")
+     ){
+         throw new ApiError(400,"All feilds are required")
+        }
+    const uploadVideo=await uploadOnCloudinary(videoFile);
+    if(!uploadVideo.url){
+        throw new ApiError(500,"Video File Not Uploaded");
+    }
+    const pic=await uploadOnCloudinary(thumbnail);
+    if(!pic.url){
+        throw new ApiError(500,"Thumbnail not uploaded");
+    }
+    const video=await Video.create({
+        owner:req.user?._id,
+        title,
+        description,
+        thumbnail:pic.url,
+        videoFile:uploadVideo.url,
+        duration:updateVideo.duration,
+    })
+    return res.status(200).json(new ApiResponse(201, video, "video uploaded sucessfully"))
 })
 
 const getVideoById = asyncHandler(async (req, res) => {
