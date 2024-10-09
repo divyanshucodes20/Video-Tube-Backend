@@ -22,37 +22,49 @@ const uploadOnCloudinary = async (localFilePath) => {
         return response;
 
     } catch (error) {
-        fs.unlinkSync(localFilePath) // remove the locally saved temporary file as the upload operation got failed
+        fs.unlinkSync(localFilePath)
+         // remove the locally saved temporary file as the upload operation got failed
+         console.error("CLOUDINARY :: FILE UPLOAD ERROR", error);
         return null;
     }
 }
 const deletefromCloudinary = async (url) => {
   try {
-    if (!url) return false;
+    if (!url) {
+      console.log("No URL provided for deletion");
+      return false;
+    }
 
-    // Extract the public ID from the Cloudinary URL
-    const publicIdMatch = url.match(/\/upload\/v\d+\/(.+?)(?:\.\w+)?$/);
+    // Extract the public ID and resource type from the Cloudinary URL
+    const publicIdMatch = url.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.\w+)?$/);
     const publicId = publicIdMatch ? publicIdMatch[1] : null;
+
+    const resourceType = url.includes('/video/') ? 'video' : 'image'; // Determine resource type
 
     if (!publicId) {
       console.log("No public ID found in the URL");
       return false;
     }
 
-    console.log("Deleting image from Cloudinary...");
+    //console.log("Deleting from Cloudinary...");
 
     const deleteResult = await cloudinary.uploader.destroy(publicId, {
-      resource_type: "auto",
+      resource_type: resourceType,
     });
 
-    console.log("Delete result:", deleteResult);
+    //console.log("Delete result:", deleteResult);
+    
+    // Check the result for success
+    if (deleteResult.result !== "ok") {
+      console.log("Failed to delete the item from Cloudinary");
+      return false;
+    }
+
     return deleteResult;
   } catch (error) {
     console.log("CLOUDINARY :: FILE Delete ERROR ", error);
-    return false;
+    throw error; // Re-throw the error to allow calling function to handle it
   }
 };
 
-
-
-export {uploadOnCloudinary,deletefromCloudinary}
+export { uploadOnCloudinary, deletefromCloudinary };
