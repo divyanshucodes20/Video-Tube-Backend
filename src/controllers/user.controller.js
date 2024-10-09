@@ -304,7 +304,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
   // Delete the old cover image from Cloudinary (if it exists)
   if (oldCoverImageUrl) {
-    const deleteResult = await deleteImagefromCloudinary(oldCoverImageUrl);
+    const deleteResult = await deletefromCloudinary(oldCoverImageUrl);
     console.log("Delete result:", deleteResult);
     if (!deleteResult || deleteResult.result !== 'ok') {
       throw new ApiError(400, "Error while deleting old cover image");

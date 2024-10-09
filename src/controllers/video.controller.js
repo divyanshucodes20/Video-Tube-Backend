@@ -24,17 +24,18 @@ const publishAVideo = asyncHandler(async (req, res) => {
     if(!uploadVideo.url){
         throw new ApiError(500,"Video File Not Uploaded");
     }
-    const pic=await uploadOnCloudinary(thumbnail);
-    if(!pic.url){
+    const uploadThumbnail=await uploadOnCloudinary(thumbnail);
+    if(!uploadThumbnail.url){
         throw new ApiError(500,"Thumbnail not uploaded");
     }
     const video=await Video.create({
         owner:req.user?._id,
         title,
         description,
-        thumbnail:pic.url,
+        thumbnail:uploadThumbnail.url,
         videoFile:uploadVideo.url,
         duration:updateVideo.duration,
+        isPublished:true
     })
     return res.status(200).json(new ApiResponse(201, video, "video uploaded sucessfully"))
 })
@@ -42,6 +43,12 @@ const publishAVideo = asyncHandler(async (req, res) => {
 const getVideoById = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     //TODO: get video by id
+    const video=await Video.findById(videoId);
+    if(!video){
+        throw new ApiError(400,"Video  not found");
+    }
+    return res.status(200)
+    .json(new ApiResponse(201,video,"Video fetched successfully"));
 })
 
 const updateVideo = asyncHandler(async (req, res) => {
@@ -53,6 +60,11 @@ const updateVideo = asyncHandler(async (req, res) => {
 const deleteVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     //TODO: delete video
+    const video=await Video.findByIdAndDelete(videoId);
+    if(!video){
+        throw new ApiError(400,"Video not deleted");
+    }
+    
 })
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
