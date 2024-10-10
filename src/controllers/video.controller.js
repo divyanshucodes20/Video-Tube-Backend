@@ -5,13 +5,64 @@ import {ApiError} from "../utils/ApiError.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
 import {deletefromCloudinary, uploadOnCloudinary} from "../utils/cloudinary.js"
+import { populate } from "dotenv"
 
 
 const getAllVideos = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
-    //TODO: get all videos based on query, sort, pagination
-    
-})
+    const { page = 1, limit = 10, query, sortBy = 'createdAt', sortType = 'desc', userId } = req.query;
+
+    const matchStage = {};
+
+    if (query) {
+        matchStage.$or = [
+            { title: { $regex: query, $options: 'i' } },
+            { description: { $regex: query, $options: 'i' } }
+        ];
+    }
+
+    if (userId) {
+        matchStage.owner = mongoose.Types.ObjectId(userId); // Ensure userId is an ObjectId
+    }
+
+    const sortStage = {
+        [sortBy]: sortType === 'desc' ? -1 : 1
+    };
+
+    // Aggregation pipeline
+    const aggregatePipeline = [
+        { $match: matchStage },
+        { $sort: sortStage },
+        {
+            $lookup: {
+                from: 'users', // Collection name in MongoDB
+                localField: 'owner',
+                foreignField: '_id',
+                as: 'owner'
+            }
+        },
+        { $unwind: '$owner' },
+        { $project: { 
+            'owner.email': 0, 
+            'owner.password': 0, 
+            'owner.watchHistory': 0, 
+            'owner.createdAt': 0, 
+            'owner.updatedAt': 0, 
+            'owner.refreshToken': 0,
+            'owner.coverImage': 0
+        }}
+    ];
+
+    const options = {
+        page: parseInt(page),
+        limit: parseInt(limit)
+    };
+
+    const videos = await Video.aggregatePaginate(Video.aggregate(aggregatePipeline), options);
+
+    res.json(videos);
+});
+
+
 
 const publishAVideo = asyncHandler(async (req, res) => {
     const { title, description} = req.body
@@ -141,8 +192,31 @@ const deleteVideo = asyncHandler(async (req, res) => {
 })
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
-    const { videoId } = req.params
-})
+    const { videoId } = req.params;
+
+    // Retrieve the current video document
+    const video = await Video.findById(videoId);
+    if (!video) {
+        throw new ApiError(404, "Video not found");
+    }
+
+    // Toggle the isPublished status
+    const updatedVideo = await Video.findByIdAndUpdate(
+        videoId,
+        {
+            $set: {
+                isPublished: !video.isPublished
+            }
+        },
+        { new: true }
+    );
+
+    if (!updatedVideo) {
+        throw new ApiError(400, "Publish status not updated");
+    }
+
+    return res.status(200).json(new ApiResponse(200, updatedVideo, "Publish status toggled"));
+});
 
 export {
     getAllVideos,
